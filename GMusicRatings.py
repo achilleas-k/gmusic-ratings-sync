@@ -201,7 +201,6 @@ if __name__ == '__main__':
         sys.exit(3)
     try:
         gmusic_lib = read_gmusic_lib()
-        #gmusic_lib = read_local_gmusic_lib('library.pic')
         gmusic_updated_lib = get_new_ratings(local_lib, gmusic_lib)
         update_metadata(api, gmusic_updated_lib)
     except Exception:
