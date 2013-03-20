@@ -202,7 +202,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
             description='Copy Amarok library ratings to Google Music.')
     parser.add_argument('--socket', '-s', metavar='socket', type=str,
-        default=os.path.join(os.environ['HOME'], '.kde4/share/apps/amarok/sock'),
+        default='./dbsocket'),
         help='socket which will be used to connect to the database with'
         ' (default: %(default)s)')
     args = parser.parse_args()
