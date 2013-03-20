@@ -1,2 +1,2 @@
 SETTINGSDIR=$HOME/.kde4/share/apps/amarok
-/usr/bin/mysqld --defaults-file=$SETTINGSDIR/my.cnf --default-storage-engine=MyISAM --datadir=$SETTINGSDIR/mysqle --socket=$SETTINGSDIR/sock --skip-grant-tables
+/usr/bin/mysqld --defaults-file=$SETTINGSDIR/my.cnf --default-storage-engine=MyISAM --datadir=$SETTINGSDIR/mysqle --socket=./dbsocket --skip-grant-tables
