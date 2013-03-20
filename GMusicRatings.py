@@ -3,7 +3,8 @@
 from getpass import getpass
 from gmusicapi import Api
 import MySQLdb as sql
-import sys
+import sys, os
+import argparse
 
 VERSION  = "0.0.1"
 DEBUG_FLAG = "false"
@@ -51,15 +52,18 @@ def make_dict(track):
             }
     return dict_track
 
-def read_amarok_lib():
+def read_amarok_lib(socket):
     '''
     Loads the relevant Amarok tables and makes dictionary lists with all the
     relevant data.
     '''
-    sys.stdout.write("Reading local database ... ")
-    sys.stdout.flush();
+    sys.stdout.write("Connecting to local database using %s ..." % (socket))
+    sys.stdout.flush()
     dbconn = sql.connect(
-            unix_socket='/home/achilleas/.kde4/share/apps/amarok/sock')
+            unix_socket=socket)
+    sys.stdout.write("OK\n")
+    sys.stdout.write("Reading local database ... ")
+    sys.stdout.flush()
     dbconn.select_db('amarok')
     cursor = dbconn.cursor()
     select_statement = '''
@@ -195,7 +199,16 @@ def update_metadata(api, library):
     return
 
 if __name__ == '__main__':
-    local_lib = read_amarok_lib()
+    parser = argparse.ArgumentParser(
+            description='Copy Amarok library ratings to Google Music.')
+    parser.add_argument('--socket', '-s', metavar='socket', type=str,
+        default=os.path.join(os.environ['HOME'], '.kde4/share/apps/amarok/sock'),
+        help='socket which will be used to connect to the database with'
+        ' (default: %(default)s)')
+    args = parser.parse_args()
+
+    # add check if file exists
+    local_lib = read_amarok_lib(args.socket)
     api = google_music_login()
     if api is None:
         sys.exit(3)
