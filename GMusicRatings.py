@@ -3,7 +3,7 @@
 from getpass import getpass
 from gmusicapi import Api
 import MySQLdb as sql
-import sys, os
+import sys
 import argparse
 
 VERSION  = "0.0.1"
@@ -202,7 +202,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
             description='Copy Amarok library ratings to Google Music.')
     parser.add_argument('--socket', '-s', metavar='socket', type=str,
-        default='./dbsocket'),
+        default='./dbsocket',
         help='socket which will be used to connect to the database with'
         ' (default: %(default)s)')
     args = parser.parse_args()
