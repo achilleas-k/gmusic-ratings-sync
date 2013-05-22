@@ -205,6 +205,11 @@ if __name__ == '__main__':
         default='./dbsocket',
         help='socket which will be used to connect to the database with'
         ' (default: %(default)s)')
+    parser.add_argument('--dry-run', '-d', action='store_true',
+            help='don\'t make any changes on remote server')
+    parser.add_argument('--local', action='store_true',
+            help=('don\'t connect to remote server - '
+                'useful for checking local db connectivity'))
     args = parser.parse_args()
 
     # add check if file exists
