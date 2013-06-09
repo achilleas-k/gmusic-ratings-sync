@@ -1,4 +1,4 @@
-gmusic-ratings-sync
+music-ratings-sync
 ===================
 
 Synchronise music ratings between databases.
