@@ -1,14 +1,21 @@
 #!/usr/bin/env python
 
+#TODO:
+#
+#   - dump db: pickle dump a database (for debugging or offline processing)
+#   - dry run: find and list actions to be made without committing changes
+#   - xbmc db: support reading and writing to xbmc music library
+#
+
 from getpass import getpass
 from gmusicapi import Api
 import MySQLdb as sql
 import sys
 import argparse
 
-VERSION  = "0.0.1"
-DEBUG_FLAG = "false"
-PRETEND_FLAG = "false"
+VERSION  = "0.0.2"
+_DEBUG_FLAG = "false"
+_PRETEND_FLAG = "false"
 
 def song_info_to_string(song):
     return "%s - %i - %s on %s (%s)" % (
@@ -200,19 +207,23 @@ def update_metadata(api, library):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-            description='Copy Amarok library ratings to Google Music.')
+            description='Synchronise music ratings between libraries.')
     parser.add_argument('--socket', '-s', metavar='socket', type=str,
         default='./dbsocket',
-        help='socket which will be used to connect to the database with'
+        help='database socket'
         ' (default: %(default)s)')
     parser.add_argument('--dry-run', '-d', action='store_true',
-            help='don\'t make any changes on remote server')
-    parser.add_argument('--local', action='store_true',
-            help=('don\'t connect to remote server - '
-                'useful for checking local db connectivity'))
+            help='don\'t commit any changes')
+    parser.add_argument('--dump-db', metavar='dbname', type=str,
+            help='read a database and dump it using python pickle')
     args = parser.parse_args()
+    socket = args.socket
+    try:
+        with open(socket): pass
+    except IOError:
+        sys.stderr.write("ERROR: socket %s does not exist\n" % (socket))
+        sys.exit(3)
 
-    # add check if file exists
     local_lib = read_amarok_lib(args.socket)
     api = google_music_login()
     if api is None:
