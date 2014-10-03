@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 #TODO:
 #
 #   - dump db: pickle dump a database (for debugging or offline processing)
