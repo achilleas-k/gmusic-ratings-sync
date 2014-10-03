@@ -96,7 +96,7 @@ def google_music_login():
     logged_in = False
     attempts = 0
     while not logged_in and attempts < 3:
-        email = raw_input("Email: ")
+        email = input("Email: ")
         password = getpass()
         logged_in = api.login(email, password, perform_upload_auth=False)
         attempts += 1
@@ -173,7 +173,7 @@ def update_remote_track(remote_lib, track):
                                         song_info_to_string(best_match[1])))
         ask = True
         while ask:
-            yesno = raw_input("Accept best match? [Y/n] ")
+            yesno = input("Accept best match? [Y/n] ")
             if yesno.lower() == 'y' or yesno == '':
                 remote_track = best_match[1]
                 if remote_track['rating'] == track['rating']:
