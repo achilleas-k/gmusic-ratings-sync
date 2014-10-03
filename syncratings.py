@@ -1,4 +1,7 @@
-#TODO:
+# THIS IS TOTALLY BROKEN
+# I NEED TO CHANGE THE AUTH AND THE WAY THE API IS USED
+#
+# TODO:
 #
 #   - dump db: pickle dump a database (for debugging or offline processing)
 #   - dry run: find and list actions to be made without committing changes
