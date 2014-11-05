@@ -3,7 +3,7 @@ import os, sys
 from getpass import getpass
 from gmusicapi import Mobileclient
 import argparse
-import stagger
+import mutagen
 
 VERSION  = "0.0.2"
 _DEBUG_FLAG = "false"
@@ -18,36 +18,23 @@ def song_info_to_string(song):
             song['album'],
             '*'*song['rating'])
 
-def match(one, two):
+def match(local, remote):
     '''
     Returns a score which shows the number of (standard) fields that are equal.
     Fields are: album name, artist name, track and year.
     '''
     score = 0
-    if one['album'].lower() == two['album'].lower():
+    if local['album'].lower() == remote['album'].lower():
         score += 1
-    if one['artist'].lower() == two['artist'].lower():
+    if local['artist'].lower() == remote['artist'].lower():
         score += 1
-    if one['track'] == two['track']:
+    if local['track'] == remote['track']:
         score += 1
-    if one['year'] == two['year']:
+    if local['year'] == remote['year']:
+        score += 1
+    if local['albumartist'].lower() == remote['albumArtist'].lower():
         score += 1
     return score
-
-def make_dict(track):
-    '''
-    Converts a track tuple to a dictionary which is more convenient to handle.
-    The indices should match the select statement in `read_amarok_lib()`.
-    '''
-    dict_track = {
-            'name': track[0],
-            'track': track[1],
-            'album': track[2],
-            'artist': track[3],
-            'year': track[4],
-            'rating': track[5]/2 # amarok ratings are 1-10
-            }
-    return dict_track
 
 def google_music_login():
     '''
@@ -68,7 +55,7 @@ def google_music_login():
     sys.stdout.write("Successfully logged in.\n")
     return api
 
-def read_gmusic_lib():
+def read_gmusic_lib(api):
     if not api.is_authenticated():
         print("Authentication failed!", file=sys.stderr)
         sys.exit()
@@ -82,7 +69,10 @@ def read_local_lib(music_root, extension_list):
             fext = fext[1:]
             if fext not in extension_list:
                 continue
-            
+            fullpath = os.path.join(dirpath, fname)
+            tag = mutagen.File(fullpath)
+            local_lib.append(tag)
+    return local_lib
 
 def update_remote_track(remote_lib, track):
     '''
@@ -97,7 +87,6 @@ def update_remote_track(remote_lib, track):
         - year
     Additional fields that could be considered (TODO):
         - duration
-        - album artist
     '''
     remote_tracks = [rtrack for rtrack in remote_lib\
             if rtrack['name'] == track['name']]
@@ -184,7 +173,7 @@ if __name__ == '__main__':
     #parser.add_argument('--dump-db', metavar='dbname', type=str,
     #        help='read a database and dump it using python pickle')
     args = parser.parse_args()
-    music_dir = args.musicdir
+    music_root = args.musicdir
     api = google_music_login()
     if api is None:
         sys.exit()
@@ -195,13 +184,16 @@ if __name__ == '__main__':
         print("done!")
         print("Reading Google music library ...", end="")
         sys.stdout.flush()
-        gmusic_lib = read_gmusic_lib()
+        gmusic_lib = read_gmusic_lib(api)
         print("done!")
-        print("Reading tags from local library [%s] ..." % music_dir, end="")
+        print("Reading tags from local library [%s] ..." % music_root, end="")
         sys.stdout.flush()
-        local_lib = read_local_lib()
+        local_lib = read_local_lib(music_root, extension_list)
         print("done!")
-        #gmusic_updated_lib = get_new_ratings(local_lib, gmusic_lib)
+        print("Checking for mismatched ratings ...",  end="")
+        sys.stdout.flush()
+        gmusic_updated_lib = get_new_ratings(local_lib, gmusic_lib)
+        print("done!")
         #update_metadata(api, gmusic_updated_lib)
     except Exception:
         api.logout()
