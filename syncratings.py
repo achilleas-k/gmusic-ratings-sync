@@ -1,18 +1,9 @@
-# THIS IS TOTALLY BROKEN
-# I NEED TO CHANGE THE AUTH AND THE WAY THE API IS USED
-#
-# TODO:
-#
-#   - dump db: pickle dump a database (for debugging or offline processing)
-#   - dry run: find and list actions to be made without committing changes
-#   - xbmc db: support reading and writing to xbmc music library
-#
-
+from __future__ import print_function
+import os, sys
 from getpass import getpass
-from gmusicapi import Api
-import MySQLdb as sql
-import sys
+from gmusicapi import Mobileclient
 import argparse
+import stagger
 
 VERSION  = "0.0.2"
 _DEBUG_FLAG = "false"
@@ -28,7 +19,8 @@ def song_info_to_string(song):
 
 def match(one, two):
     '''
-    Returns a score which shows the number of fields that are equal.
+    Returns a score which shows the number of (standard) fields that are equal.
+    Fields are: album name, artist name, track and year.
     '''
     score = 0
     if one['album'].lower() == two['album'].lower():
@@ -39,10 +31,6 @@ def match(one, two):
         score += 1
     if one['year'] == two['year']:
         score += 1
-    #print("%s \n %s \n score %i" % (
-    #    song_info_to_string(one),
-    #    song_info_to_string(two),
-    #    score))
     return score
 
 def make_dict(track):
@@ -60,67 +48,31 @@ def make_dict(track):
             }
     return dict_track
 
-def read_amarok_lib(socket):
-    '''
-    Loads the relevant Amarok tables and makes dictionary lists with all the
-    relevant data.
-    '''
-    sys.stdout.write("Connecting to local database using %s ..." % (socket))
-    sys.stdout.flush()
-    dbconn = sql.connect(
-            unix_socket=socket)
-    sys.stdout.write("OK\n")
-    sys.stdout.write("Reading local database ... ")
-    sys.stdout.flush()
-    dbconn.select_db('amarok')
-    cursor = dbconn.cursor()
-    select_statement = '''
-            SELECT tracks.title,
-                    tracks.tracknumber,
-                    albums.name,
-                    artists.name,
-                    tracks.year,
-                    statistics.rating
-            FROM tracks, albums, artists, statistics
-            WHERE tracks.url = statistics.url and tracks.artist = artists.id
-                    and tracks.album = albums.id;
-            '''
-    cursor.execute(select_statement)
-    local_lib = cursor.fetchall()
-    sys.stdout.write("done.\n")
-    return local_lib
-
 def google_music_login():
     '''
     Ask for credentials and log into Google music.
     '''
     sys.stdout.write("Connecting to Google Music ...\n")
-    api = Api()
+    api = Mobileclient()
     logged_in = False
     attempts = 0
     while not logged_in and attempts < 3:
-        email = input("Email: ")
+        email = raw_input("Email: ")
         password = getpass()
-        logged_in = api.login(email, password, perform_upload_auth=False)
+        logged_in = api.login(email, password)
         attempts += 1
     if not api.is_authenticated():
-        sys.stderr("Login failed.\n")
+        print("Login failed.", file=sys.stderr)
         return None
     sys.stdout.write("Successfully logged in.\n")
     return api
 
 def read_gmusic_lib():
     if not api.is_authenticated():
-        sys.stderr.write('Something went wrong. No auth.\n')
-        sys.exit(3)
+        print("Authentication failed!", file=sys.stderr)
+        sys.exit()
     gm_lib = api.get_all_songs()
     return gm_lib
-
-def read_local_gmusic_lib(filename):
-    libfile = open(filename, 'r')
-    import pickle
-    locallib = pickle.load(libfile)
-    return locallib
 
 def update_remote_track(remote_lib, track):
     '''
@@ -176,7 +128,7 @@ def update_remote_track(remote_lib, track):
                                         song_info_to_string(best_match[1])))
         ask = True
         while ask:
-            yesno = input("Accept best match? [Y/n] ")
+            yesno = raw_input("Accept best match? [Y/n] ")
             if yesno.lower() == 'y' or yesno == '':
                 remote_track = best_match[1]
                 if remote_track['rating'] == track['rating']:
@@ -209,33 +161,28 @@ def update_metadata(api, library):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
             description='Synchronise music ratings between libraries.')
-    parser.add_argument('--socket', '-s', metavar='socket', type=str,
-        default='./dbsocket',
-        help='database socket'
-        ' (default: %(default)s)')
-    parser.add_argument('--dry-run', '-d', action='store_true',
-            help='don\'t commit any changes')
-    parser.add_argument('--dump-db', metavar='dbname', type=str,
-            help='read a database and dump it using python pickle')
+    parser.add_argument('musicdir', metavar='MUSICDIR', type=str,
+                        help="Local music directory")
+    #parser.add_argument('--dry-run', '-d', action='store_true',
+    #        help='don\'t commit any changes')
+    #parser.add_argument('--dump-db', metavar='dbname', type=str,
+    #        help='read a database and dump it using python pickle')
     args = parser.parse_args()
-    socket = args.socket
-    try:
-        with open(socket): pass
-    except IOError:
-        sys.stderr.write("ERROR: socket %s does not exist\n" % (socket))
-        sys.exit(3)
-
-    local_lib = read_amarok_lib(args.socket)
+    music_dir = args.musicdir
     api = google_music_login()
     if api is None:
-        sys.exit(3)
+        sys.exit()
     try:
+        print("Reading Google music library ...", end="")
+        sys.stdout.flush()
         gmusic_lib = read_gmusic_lib()
-        gmusic_updated_lib = get_new_ratings(local_lib, gmusic_lib)
-        update_metadata(api, gmusic_updated_lib)
+        print("done!")
+        print("Reading tags from local library [%s] ..." % music_dir, end="")
+        sys.stdout.flush()
+        #gmusic_updated_lib = get_new_ratings(local_lib, gmusic_lib)
+        #update_metadata(api, gmusic_updated_lib)
     except Exception:
         api.logout()
         raise
-
     api.logout()
 
