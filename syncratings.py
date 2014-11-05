@@ -75,6 +75,15 @@ def read_gmusic_lib():
     gm_lib = api.get_all_songs()
     return gm_lib
 
+def read_local_lib(music_root, extension_list):
+    for dirpath, dirnames, filenames in os.walk(music_root):
+        for fname in filenames:
+            _, fext = os.path.splitext(fname)
+            fext = fext[1:]
+            if fext not in extension_list:
+                continue
+            
+
 def update_remote_track(remote_lib, track):
     '''
     First retrieves a list of all songs that match the song title, then checks
@@ -183,12 +192,15 @@ if __name__ == '__main__':
         print("Loading extension list ...", end="")
         sys.stdout.flush()
         extension_list = read_extensions(_EXTENSION_LIST_FILE)
+        print("done!")
         print("Reading Google music library ...", end="")
         sys.stdout.flush()
         gmusic_lib = read_gmusic_lib()
         print("done!")
         print("Reading tags from local library [%s] ..." % music_dir, end="")
         sys.stdout.flush()
+        local_lib = read_local_lib()
+        print("done!")
         #gmusic_updated_lib = get_new_ratings(local_lib, gmusic_lib)
         #update_metadata(api, gmusic_updated_lib)
     except Exception:
