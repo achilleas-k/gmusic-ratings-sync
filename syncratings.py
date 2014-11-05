@@ -4,6 +4,7 @@ from getpass import getpass
 from gmusicapi import Mobileclient
 import argparse
 import mutagen
+import mutagen.easyid3
 
 VERSION  = "0.0.2"
 _DEBUG_FLAG = "false"
@@ -13,8 +14,8 @@ _EXTENSION_LIST_FILE = "common_audio_ext.txt"
 def song_info_to_string(song):
     return "%s - %i - %s on %s (%s)" % (
             song['artist'],
-            song['track'] if song['track'] else 0,
-            song['name'],
+            song['tracknumber'] if song['tracknumber'] else 0,
+            song['title'],
             song['album'],
             '*'*song['rating'])
 
@@ -28,11 +29,9 @@ def match(local, remote):
         score += 1
     if local['artist'].lower() == remote['artist'].lower():
         score += 1
-    if local['track'] == remote['track']:
+    if local['tracknumber'] == remote['trackNumber']:
         score += 1
     if local['year'] == remote['year']:
-        score += 1
-    if local['albumartist'].lower() == remote['albumArtist'].lower():
         score += 1
     return score
 
@@ -62,19 +61,61 @@ def read_gmusic_lib(api):
     gm_lib = api.get_all_songs()
     return gm_lib
 
+def read_tag(fullpath, ftype):
+    try:
+        mutag = mutagen.File(fullpath)
+        if ftype == "mp3":
+            id3 = mutagen.easyid3.EasyID3(fullpath)
+            for k, v in id3.items():
+                mutag[k] = v
+            if "TXXX:FMPS_Rating" in mutag:
+                mutag["rating"] = float(mutag["TXXX:FMPS_Rating"].text[0])
+        else:
+            mutag["rating"] = float(mutag["fmps_rating"][0])
+        tag = {}
+        for k, v in mutag.items():
+            if type(v) is list:
+                if len(v) == 1:
+                    tag[k] = v[0]
+            else:
+                tag[k] = v
+        if 'album' in tag:
+            tag['album'] = tag['album'][0]
+        if 'title' in tag:
+            tag['title'] = tag['title'][0]
+        if 'artist' in tag:
+            tag['artist'] = tag['artist'][0]
+        if 'tracknumber' in tag:
+            tnum = tag['tracknumber']
+            tnum = tnum.split("/")[0]
+            tag['tracknumber'] = int(tnum)
+        if 'year' in tag:
+            tag['year'] = int(tag['year'][0])
+        if 'rating' in tag:
+            tag['rating'] = int(tag['rating']*5)
+    except Exception:
+        # TODO: Handle exception or print meaningful error
+        #for k, v in tag.items():
+        #    print("%s - %s" % (k, str(v)))
+        raise
+    return tag
+
 def read_local_lib(music_root, extension_list):
+    local_lib = []
     for dirpath, dirnames, filenames in os.walk(music_root):
         for fname in filenames:
             _, fext = os.path.splitext(fname)
-            fext = fext[1:]
-            if fext not in extension_list:
+            fext = fext[1:].lower()
+            if fext+"\n" not in extension_list:
                 continue
             fullpath = os.path.join(dirpath, fname)
-            tag = mutagen.File(fullpath)
+            tag = read_tag(fullpath, fext)
             local_lib.append(tag)
+            print("\r%i" % len(local_lib), end=" ...")
+            sys.stdout.flush()
     return local_lib
 
-def update_remote_track(remote_lib, track):
+def update_remote_lib(remote_lib, track):
     '''
     First retrieves a list of all songs that match the song title, then checks
     for items that match the rest of the fields.
@@ -89,13 +130,13 @@ def update_remote_track(remote_lib, track):
         - duration
     '''
     remote_tracks = [rtrack for rtrack in remote_lib\
-            if rtrack['name'] == track['name']]
+            if rtrack['title'].lower() == track['title'].lower()]
 
     matches = []
     for rt in remote_tracks:
         score = match(track, rt)
         if score >= 2:
-            'Just look for a match rating of 2+ for now.'
+            # Just look for a match rating of 2+ for now
             matches.append((score, rt))
     if len(matches) == 1:
         remote_track = matches[0][1]
@@ -114,38 +155,40 @@ def update_remote_track(remote_lib, track):
         remote_track = None
     else:
         # PICK HIGHEST RATED TRACK
-        sys.stdout.write('---\n\n')
-        sys.stdout.write("Multiple matching songs found in remote library.\n")
-        sys.stdout.write("Local song info: %s\n" % (
-            song_info_to_string(track)))
-        sys.stdout.write("Matching songs:\n")
-        for m in matches:
-            sys.stdout.write("%s - match score: %i\n" % (
-                song_info_to_string(m[1]), m[0]))
+        #sys.stdout.write('---\n\n')
+        #sys.stdout.write("Multiple matching songs found in remote library.\n")
+        #sys.stdout.write("Local song info: %s\n" % (
+        #    song_info_to_string(track)))
+        #sys.stdout.write("Matching songs:\n")
+        #for m in matches:
+        #    sys.stdout.write("%s - match score: %i\n" % (
+        #        song_info_to_string(m[1]), m[0]))
+        #best_match = max(matches, key=lambda m: m[0])
+        #sys.stdout.write("Best match is %s\n" % (
+        #                                song_info_to_string(best_match[1])))
+        #ask = True
+        #while ask:
+        #    yesno = raw_input("Accept best match? [Y/n] ")
+        #    if yesno.lower() == 'y' or yesno == '':
+        #        remote_track = best_match[1]
+        #        if remote_track['rating'] == track['rating']:
+        #            remote_track = None
+        #        ask = False
+        #    elif yesno.lower() == 'n':
+        #        remote_track = None
+        #        ask = False
         best_match = max(matches, key=lambda m: m[0])
-        sys.stdout.write("Best match is %s\n" % (
-                                        song_info_to_string(best_match[1])))
-        ask = True
-        while ask:
-            yesno = raw_input("Accept best match? [Y/n] ")
-            if yesno.lower() == 'y' or yesno == '':
-                remote_track = best_match[1]
-                if remote_track['rating'] == track['rating']:
-                    remote_track = None
-                ask = False
-            elif yesno.lower() == 'n':
-                remote_track = None
-                ask = False
+        remote_track = best_match[1]
+        remote_track['rating'] = track['rating']
     return remote_track
 
 def get_new_ratings(local_lib, remote_lib):
     new_remotes = []
-    for lt in local_lib:
-        local_track = make_dict(lt)
+    for local_track in local_lib:
         if local_track['rating'] == 0:
-            'Nothing to do here'
+            # Nothing to do here
             continue
-        remote_track = update_remote_track(remote_lib, local_track)
+        remote_track = update_remote_lib(remote_lib, local_track)
         if remote_track is not None:
             new_remotes.append(remote_track)
     return new_remotes
@@ -174,29 +217,29 @@ if __name__ == '__main__':
     #        help='read a database and dump it using python pickle')
     args = parser.parse_args()
     music_root = args.musicdir
-    api = google_music_login()
+    #api = google_music_login()
+    api = None
     if api is None:
-        sys.exit()
+        #sys.exit()
+        pass
     try:
-        print("Loading extension list ...", end="")
+        print("Loading extension list ... ", end="")
         sys.stdout.flush()
         extension_list = read_extensions(_EXTENSION_LIST_FILE)
         print("done!")
-        print("Reading Google music library ...", end="")
+        print("Reading Google music library ... ", end="")
         sys.stdout.flush()
-        gmusic_lib = read_gmusic_lib(api)
+        #gmusic_lib = read_gmusic_lib(api)
         print("done!")
-        print("Reading tags from local library [%s] ..." % music_root, end="")
-        sys.stdout.flush()
+        print("Reading tags from local library [%s] " % music_root)
         local_lib = read_local_lib(music_root, extension_list)
         print("done!")
-        print("Checking for mismatched ratings ...",  end="")
+        print("Checking for mismatched ratings ... ",  end="")
         sys.stdout.flush()
-        gmusic_updated_lib = get_new_ratings(local_lib, gmusic_lib)
+        #gmusic_updated_lib = get_new_ratings(local_lib, gmusic_lib)
         print("done!")
         #update_metadata(api, gmusic_updated_lib)
     except Exception:
-        api.logout()
+        #api.logout()
         raise
-    api.logout()
-
+    #api.logout()
