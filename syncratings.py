@@ -8,6 +8,7 @@ import stagger
 VERSION  = "0.0.2"
 _DEBUG_FLAG = "false"
 _PRETEND_FLAG = "false"
+_EXTENSION_LIST_FILE = "common_audio_ext.txt"
 
 def song_info_to_string(song):
     return "%s - %i - %s on %s (%s)" % (
@@ -158,6 +159,12 @@ def update_metadata(api, library):
     sys.stdout.write("done.\n")
     return
 
+def read_extensions(filename):
+    extlist = []
+    with open(filename, 'r') as extfile:
+        extlist = extfile.readlines()
+    return extlist
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
             description='Synchronise music ratings between libraries.')
@@ -173,6 +180,9 @@ if __name__ == '__main__':
     if api is None:
         sys.exit()
     try:
+        print("Loading extension list ...", end="")
+        sys.stdout.flush()
+        extension_list = read_extensions(_EXTENSION_LIST_FILE)
         print("Reading Google music library ...", end="")
         sys.stdout.flush()
         gmusic_lib = read_gmusic_lib()
